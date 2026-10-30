@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Asignación Docente IB - San Pedro & Villa Cáritas</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            jakarta: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [v-cloak] { display: none !important; }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-800 font-sans antialiased min-h-screen">
+
+  <div id="app" v-cloak class="min-h-screen flex flex-col bg-slate-100">
+
+    <!-- HEADER -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
+            <i class="fa-solid fa-calculator"></i>
+          </div>
+          <div>
+            <h1 class="font-jakarta font-bold text-lg md:text-xl text-white tracking-tight flex items-center gap-2">
+              Simulador de Asignación Docente IB
+              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Versión Bloques</span>
+            </h1>
+            <p class="text-xs text-slate-400">Colegios San Pedro & Villa Cáritas · Profesores: P1 SP, P2 SP, P1 VC, P2 VC</p>
+          </div>
+        </div>
+
+        <!-- PRESET BUTTONS -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button @click="loadPreset('optionB')" 
+                  :class="activePreset === 'optionB' ? 'bg-emerald-600 text-white shadow-emerald-900/30 ring-2 ring-emerald-400' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'"
+                  class="px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-star text-amber-300"></i>
+            Opción B (Recomendada - 68b)
+          </button>
+          
+          <button @click="loadPreset('optionA')" 
+                  :class="activePreset === 'optionA' ? 'bg-blue-600 text-white shadow-blue-900/30 ring-2 ring-blue-400' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'"
+                  class="px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-bolt text-yellow-400"></i>
+            Opción A (Máx Carga - 80b)
+          </button>
+
+          <button @click="loadPreset('pureIb')" 
+                  :class="activePreset === 'pureIb' ? 'bg-indigo-600 text-white ring-2 ring-indigo-400' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'"
+                  class="px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-graduation-cap"></i>
+            Solo IB (56b)
+          </button>
+
+          <!-- BOTÓN PARA HABILITAR/DESHABILITAR 5º PROFESOR -->
+          <button @click="toggle5thTeacher" 
+                  :class="enable5thTeacher ? 'bg-amber-600 text-white ring-2 ring-amber-400 shadow-amber-900/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'"
+                  class="px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm border border-slate-700">
+            <i class="fa-solid" :class="enable5thTeacher ? 'fa-user-check text-amber-200' : 'fa-user-plus text-slate-400'"></i>
+            {{ enable5thTeacher ? '5º Prof. Activo (P3 VC/SP)' : '+ 5º Prof. (P3 VC/SP)' }}
+          </button>
+
+          <button @click="clearAssignments" 
+                  class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">
+            <i class="fa-solid fa-rotate-left"></i> Limpiar
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI DASHBOARD BANNER -->
+    <section class="bg-white border-b border-slate-200 shadow-sm py-4">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+        
+        <!-- KPI 1: Total Bloques -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex items-center gap-3">
+          <div class="w-11 h-11 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Carga Total Asignada</p>
+            <div class="flex items-baseline gap-1.5">
+              <span class="font-jakarta font-extrabold text-2xl text-slate-900">{{ totalAssignedBlocks }}</span>
+              <span class="text-xs font-medium text-slate-500">/ {{ maxCapacity }} max</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 2: Estado de Viabilidad -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex items-center gap-3">
+          <div :class="statusBgClass" class="w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold transition-colors">
+            <i :class="statusIconClass"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado de Reglas</p>
+            <p :class="statusTextClass" class="font-jakarta font-extrabold text-base tracking-tight">
+              {{ statusTitle }}
+            </p>
+          </div>
+        </div>
+
+        <!-- KPI 3: Profesores en Techo (>20b) -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex items-center gap-3">
+          <div class="w-11 h-11 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-lg font-bold">
+            <i class="fa-solid fa-gauge-high"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Docentes &gt; 20 Bloques</p>
+            <div class="flex items-baseline gap-1.5">
+              <span class="font-jakarta font-extrabold text-2xl text-slate-900">{{ teachersOver20 }}</span>
+              <span class="text-xs font-medium text-slate-500">de {{ teachers.length }} prof.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 4: Acompañamiento Disponible -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex items-center gap-3">
+          <div class="w-11 h-11 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg font-bold">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bloques Libres (IA/EE)</p>
+            <div class="flex items-baseline gap-1.5">
+              <span class="font-jakarta font-extrabold text-2xl text-emerald-700">{{ totalFreeBlocks }}</span>
+              <span class="text-xs font-medium text-slate-500">bloques</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- MAIN APP CONTENT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN: TEACHERS & WORKLOAD CARDS (5 COLS) -->
+      <section class="lg:col-span-5 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-jakarta font-bold text-base text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-user-group text-blue-600"></i>
+            Estado de Carga por Docente
+          </h2>
+          <span class="text-xs font-medium text-slate-500">Límite: 22 Bloques/semana</span>
+        </div>
+
+        <!-- TEACHER CARDS LOOP -->
+        <div class="flex flex-col gap-3">
+          <div v-for="teacher in teachers" :key="teacher.id"
+               class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition">
+            
+            <div class="flex items-start justify-between mb-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-jakarta font-bold text-slate-900 text-base">{{ teacher.id }}</span>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                    Base {{ teacher.baseSchool }}
+                  </span>
+                  <!-- Mobility Indicator -->
+                  <span v-if="getTeacherMobility(teacher.id)" 
+                        class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                    <i class="fa-solid fa-bus text-[9px]"></i> Movilidad Inter-Sede
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">{{ teacher.role }}</p>
+              </div>
+
+              <div class="text-right">
+                <span :class="getTeacherBadgeClass(teacher)" class="font-jakarta font-extrabold text-lg px-2.5 py-1 rounded-lg inline-block">
+                  {{ getTeacherBlocks(teacher.id) }} <span class="text-xs font-normal text-slate-500">/ 22b</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- WORKLOAD PROGRESS BAR -->
+            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden mb-3">
+              <div :style="{ width: Math.min((getTeacherBlocks(teacher.id) / 22) * 100, 100) + '%' }"
+                   :class="getTeacherBarClass(teacher)"
+                   class="h-full transition-all duration-300 rounded-full"></div>
+            </div>
+
+            <!-- ASSIGNED COURSES CHIPS -->
+            <div class="space-y-1.5">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cursos Asignados:</p>
+              <div v-if="getTeacherCourses(teacher.id).length === 0" class="text-xs text-slate-400 italic py-1">
+                Ningún curso asignado
+              </div>
+              <div v-else class="flex flex-wrap gap-1.5">
+                <span v-for="c in getTeacherCourses(teacher.id)" :key="c.id"
+                      class="text-xs font-medium px-2 py-1 rounded-md bg-slate-50 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900">{{ c.name }}</span>
+                  <span class="text-[10px] px-1 bg-slate-200 text-slate-700 rounded font-semibold">{{ c.blocks }}b</span>
+                  <button @click="unassignCourse(c.id)" class="text-slate-400 hover:text-red-500 ml-0.5">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                  </button>
+                </span>
+              </div>
+            </div>
+
+            <!-- FOOTER INFO: HOLGURA PARA ACOMPAÑAMIENTO -->
+            <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span>Holgura para IA / Monografías:</span>
+              <span class="font-bold" :class="getTeacherFreeBlocks(teacher.id) >= 5 ? 'text-emerald-600' : 'text-amber-600'">
+                {{ getTeacherFreeBlocks(teacher.id) }} bloques libres
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- WORKLOAD DISTRIBUTION CHART CARD -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <h3 class="font-jakarta font-bold text-sm text-slate-800 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-blue-600"></i>
+            Comparativa de Carga Semanal (Bloques)
+          </h3>
+          <div class="h-44 relative">
+            <canvas id="workloadChart"></canvas>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: ASSIGNMENT MATRIX & CONSTRAINTS (7 COLS) -->
+      <section class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- TAB NAVIGATION -->
+        <div class="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 shadow-sm">
+          <button @click="activeTab = 'allocator'"
+                  :class="activeTab === 'allocator' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'"
+                  class="flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-sliders"></i>
+            Asignador de Cursos
+          </button>
+
+          <button @click="activeTab = 'validation'"
+                  :class="activeTab === 'validation' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'"
+                  class="flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 relative">
+            <i class="fa-solid fa-shield-check"></i>
+            Reglas e Inspector
+            <span v-if="validationErrors.length > 0" class="w-2 h-2 rounded-full bg-red-500"></span>
+          </button>
+
+          <button @click="activeTab = 'schedule'"
+                  :class="activeTab === 'schedule' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'"
+                  class="flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-calendar-days"></i>
+            Simultaneidad
+          </button>
+        </div>
+
+        <!-- TAB 1: ALLOCATOR MATRIX -->
+        <div v-show="activeTab === 'allocator'" class="flex flex-col gap-4">
+
+          <!-- AÑO 1 SAN PEDRO -->
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                <h3 class="font-jakarta font-bold text-sm text-slate-900">Año 1 · Colegio San Pedro (3 Salones Simultáneos)</h3>
+              </div>
+              <span class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                17 Bloques Total
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div v-for="course in getCoursesByGroup('SP_Y1')" :key="course.id"
+                   class="bg-slate-50 rounded-lg p-3 border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="font-bold text-xs text-slate-900">{{ course.name }}</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded">{{ course.blocks }}b</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mb-2">{{ course.desc }}</p>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-semibold text-slate-400 block mb-1">Docente Asignado:</label>
+                  <select v-model="assignments[course.id]" 
+                          class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-md p-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option :value="null">-- Seleccionar --</option>
+                    <option v-for="t in teachers" :key="t.id" :value="t.id">
+                      {{ t.id }} ({{ t.baseSchool }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AÑO 1 VILLA CÁRITAS -->
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                <h3 class="font-jakarta font-bold text-sm text-slate-900">Año 1 · Colegio Villa Cáritas (4 Salones Simultáneos)</h3>
+              </div>
+              <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                22 Bloques Total
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div v-for="course in getCoursesByGroup('VC_Y1')" :key="course.id"
+                   class="bg-slate-50 rounded-lg p-3 border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="font-bold text-xs text-slate-900">{{ course.name }}</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">{{ course.blocks }}b</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mb-2">{{ course.desc }}</p>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-semibold text-slate-400 block mb-1">Docente Asignado:</label>
+                  <select v-model="assignments[course.id]" 
+                          class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-md p-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <option :value="null">-- Seleccionar --</option>
+                    <option v-for="t in teachers" :key="t.id" :value="t.id">
+                      {{ t.id }} ({{ t.baseSchool }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AÑO 2 DIPLOMA -->
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                <h3 class="font-jakarta font-bold text-sm text-slate-900">Año 2 · Diploma IB (Sede Variable)</h3>
+              </div>
+              <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
+                17 Bloques Total
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div v-for="course in getCoursesByGroup('Y2')" :key="course.id"
+                   class="bg-slate-50 rounded-lg p-3 border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="font-bold text-xs text-slate-900">{{ course.name }}</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded">{{ course.blocks }}b</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mb-2">{{ course.desc }}</p>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-semibold text-slate-400 block mb-1">Docente Asignado:</label>
+                  <select v-model="assignments[course.id]" 
+                          class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-md p-1.5 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    <option :value="null">-- Seleccionar --</option>
+                    <option v-for="t in teachers" :key="t.id" :value="t.id">
+                      {{ t.id }} ({{ t.baseSchool }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GRADO 10 (OPCIONALES PARA COMPLETAR CARGA) -->
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <h3 class="font-jakarta font-bold text-sm text-slate-900">Grado 10 · Cursos Pre-IB (6 Bloques c/u)</h3>
+              </div>
+              <span class="text-xs text-slate-500">
+                Opcional para absorber capacidad
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div v-for="course in getCoursesByGroup('G10')" :key="course.id"
+                   class="bg-slate-50 rounded-lg p-2.5 border border-slate-200 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="font-bold text-xs text-slate-900">{{ course.name }}</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">6b</span>
+                </div>
+
+                <select v-model="assignments[course.id]" 
+                        class="w-full text-xs bg-white border border-slate-300 rounded p-1 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                  <option :value="null">-- No Asignado a IB --</option>
+                  <option v-for="t in teachers" :key="t.id" :value="t.id">
+                    {{ t.id }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TAB 2: VALIDATION & RULE INSPECTOR -->
+        <div v-show="activeTab === 'validation'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <h3 class="font-jakarta font-bold text-base text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-clipboard-check text-blue-600"></i>
+            Inspector de Reglas del Colegio y del IB
+          </h3>
+
+          <!-- CHECKS LIST -->
+          <div class="space-y-3">
+            
+            <!-- RULE 1: VC Y1 SIMULTANEITY (CRITICAL) -->
+            <div :class="checkVcSimultaneity.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'"
+                 class="p-3.5 rounded-xl border flex items-start gap-3">
+              <div :class="checkVcSimultaneity.valid ? 'text-emerald-600' : 'text-red-600'" class="text-lg mt-0.5">
+                <i :class="checkVcSimultaneity.valid ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark'"></i>
+              </div>
+              <div>
+                <h4 class="font-jakarta font-bold text-sm text-slate-900">
+                  Simultaneidad de Villa Cáritas (Año 1): 4 Profesores Distintos
+                </h4>
+                <p class="text-xs text-slate-600 mt-0.5">
+                  {{ checkVcSimultaneity.message }}
+                </p>
+              </div>
+            </div>
+
+            <!-- RULE 2: SP Y1 SIMULTANEITY -->
+            <div :class="checkSpSimultaneity.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'"
+                 class="p-3.5 rounded-xl border flex items-start gap-3">
+              <div :class="checkSpSimultaneity.valid ? 'text-emerald-600' : 'text-red-600'" class="text-lg mt-0.5">
+                <i :class="checkSpSimultaneity.valid ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark'"></i>
+              </div>
+              <div>
+                <h4 class="font-jakarta font-bold text-sm text-slate-900">
+                  Simultaneidad de San Pedro (Año 1): 3 Profesores Distintos
+                </h4>
+                <p class="text-xs text-slate-600 mt-0.5">
+                  {{ checkSpSimultaneity.message }}
+                </p>
+              </div>
+            </div>
+
+            <!-- RULE 3: Y2 SIMULTANEITY -->
+            <div :class="checkY2Simultaneity.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'"
+                 class="p-3.5 rounded-xl border flex items-start gap-3">
+              <div :class="checkY2Simultaneity.valid ? 'text-emerald-600' : 'text-amber-600'" class="text-lg mt-0.5">
+                <i :class="checkY2Simultaneity.valid ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'"></i>
+              </div>
+              <div>
+                <h4 class="font-jakarta font-bold text-sm text-slate-900">
+                  Simultaneidad de Año 2 (MAE SL vs MAE HL)
+                </h4>
+                <p class="text-xs text-slate-600 mt-0.5">
+                  {{ checkY2Simultaneity.message }}
+                </p>
+              </div>
+            </div>
+
+            <!-- RULE 4: MAX WORKLOAD LIMIT (22 BLOQUES) -->
+            <div :class="checkMaxWorkload.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'"
+                 class="p-3.5 rounded-xl border flex items-start gap-3">
+              <div :class="checkMaxWorkload.valid ? 'text-emerald-600' : 'text-red-600'" class="text-lg mt-0.5">
+                <i :class="checkMaxWorkload.valid ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark'"></i>
+              </div>
+              <div>
+                <h4 class="font-jakarta font-bold text-sm text-slate-900">
+                  Tope Institucional de Carga (Máximo 22 Bloques/Docente)
+                </h4>
+                <p class="text-xs text-slate-600 mt-0.5">
+                  {{ checkMaxWorkload.message }}
+                </p>
+              </div>
+            </div>
+
+            <!-- RULE 5: PEDAGOGICAL RULE (MAE HL vs MAI) -->
+            <div :class="checkMaeHlExclusivity.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'"
+                 class="p-3.5 rounded-xl border flex items-start gap-3">
+              <div :class="checkMaeHlExclusivity.valid ? 'text-emerald-600' : 'text-amber-600'" class="text-lg mt-0.5">
+                <i :class="checkMaeHlExclusivity.valid ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'"></i>
+              </div>
+              <div>
+                <h4 class="font-jakarta font-bold text-sm text-slate-900">
+                  Regla Pedagógica: Exclusividad Docente en MAE HL
+                </h4>
+                <p class="text-xs text-slate-600 mt-0.5">
+                  {{ checkMaeHlExclusivity.message }}
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB 3: SCHEDULE & SIMULTANEITY ANALYSIS -->
+        <div v-show="activeTab === 'schedule'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-jakarta font-bold text-base text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-check text-blue-600"></i>
+              Análisis de Malla y Escalonamiento
+            </h3>
+            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+              Escalonamiento Habilitado
+            </span>
+          </div>
+
+          <p class="text-xs text-slate-600">
+            Para que los 4 profesores puedan ser compartidos entre San Pedro y Villa Cáritas, los bloques de matemáticas de Año 1 de ambas sedes deben estar escalonados en el horario escolar.
+          </p>
+
+          <!-- SIMULTANEITY TIMETABLE VISUALIZER -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800 text-white font-jakarta">
+                <tr>
+                  <th class="p-3">Bloque Horario</th>
+                  <th class="p-3">Sede Activa</th>
+                  <th class="p-3">Salón 1</th>
+                  <th class="p-3">Salón 2</th>
+                  <th class="p-3">Salón 3</th>
+                  <th class="p-3">Salón 4</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-medium">
+                <tr class="bg-blue-50/50">
+                  <td class="p-3 font-bold text-blue-900">Bloque A (Mañana)</td>
+                  <td class="p-3"><span class="font-bold text-blue-800">San Pedro</span> (3 Salones)</td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('SP-MAE-HL1') }}</span><br><span class="text-[10px] text-slate-500">SP MAE HL</span></td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('SP-MAE-SL1') }}</span><br><span class="text-[10px] text-slate-500">SP MAE SL</span></td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('SP-MAI-SL1') }}</span><br><span class="text-[10px] text-slate-500">SP MAI SL</span></td>
+                  <td class="p-3 text-slate-400 italic">Libre / Apoyo</td>
+                </tr>
+                <tr class="bg-emerald-50/50">
+                  <td class="p-3 font-bold text-emerald-900">Bloque B (Tarde)</td>
+                  <td class="p-3"><span class="font-bold text-emerald-800">Villa Cáritas</span> (4 Salones)</td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('VC-MAE-HL1') }}</span><br><span class="text-[10px] text-slate-500">VC MAE HL</span></td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('VC-MAE-SL1') }}</span><br><span class="text-[10px] text-slate-500">VC MAE SL</span></td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('VC-MAI-SL1-A') }}</span><br><span class="text-[10px] text-slate-500">VC MAI A</span></td>
+                  <td class="p-3"><span class="font-bold">{{ getAssignedTeacher('VC-MAI-SL1-B') }}</span><br><span class="text-[10px] text-slate-500">VC MAI B</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-600 flex items-center gap-3">
+            <i class="fa-solid fa-circle-info text-blue-600 text-lg"></i>
+            <div>
+              <p class="font-bold text-slate-800">Cierre de Malla sin Choques:</p>
+              <p>Dado que Villa Cáritas usa a los 4 profesores en el Bloque B, San Pedro utiliza a 3 de ellos en el Bloque A. Queda 1 profesor libre durante el bloque de San Pedro para labores de tutoría o apoyo.</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-auto">
+      <div class="max-w-7xl mx-auto px-4 text-center">
+        <div>Plan de Planificación y Asignación Docente de Matemáticas IB · Colegios San Pedro y Villa Cáritas</div>
+        <div class="mt-1 text-slate-500 font-medium">Desarrollado por Javier Trigoso para los colegios VCSP | 2026</div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- VUE APPLICATION LOGIC -->
+  <script>
+    const { createApp, ref, computed, watch, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const activeTab = ref('allocator');
+        const activePreset = ref('optionB');
+        const enable5thTeacher = ref(false);
+
+        // BASE TEACHERS LIST
+        const baseTeachers = [
+          { id: 'P1 SP', name: 'Profesor 1', baseSchool: 'SP', role: 'Especialista MAE HL & Y2' },
+          { id: 'P2 SP', name: 'Profesor 2', baseSchool: 'SP', role: 'Especialista MAE HL Inter-Sedes' },
+          { id: 'P1 VC', name: 'Profesor 3', baseSchool: 'VC', role: 'Especialista MAE SL & Y2 SL' },
+          { id: 'P2 VC', name: 'Profesor 4', baseSchool: 'VC', role: 'Especialista MAI & CPG' },
+        ];
+
+        const fifthTeacher = { id: 'P3 VC/SP', name: 'Profesor 5 (Refuerzo)', baseSchool: 'VC/SP', role: 'Apoyo Inter-Sedes / Comodín' };
+
+        const teachers = computed(() => {
+          return enable5thTeacher.value ? [...baseTeachers, fifthTeacher] : baseTeachers;
+        });
+
+        const toggle5thTeacher = () => {
+          enable5thTeacher.value = !enable5thTeacher.value;
+          if (!enable5thTeacher.value) {
+            // Desasignar cursos asignados al 5º profesor si se apaga
+            Object.keys(assignments.value).forEach(cId => {
+              if (assignments.value[cId] === 'P3 VC/SP') {
+                assignments.value[cId] = null;
+              }
+            });
+          }
+          updateChart();
+        };
+
+        const maxCapacity = computed(() => teachers.value.length * 22);
+
+        // COURSES DEFINITION
+        const courses = ref([
+          // Año 1 San Pedro
+          { id: 'SP-MAE-SL1', name: 'SP MAE SL', group: 'SP_Y1', blocks: 5, desc: 'San Pedro · Año 1 Nivel Medio' },
+          { id: 'SP-MAE-HL1', name: 'SP MAE HL', group: 'SP_Y1', blocks: 7, desc: 'San Pedro · Año 1 Nivel Superior (5b + 2b)' },
+          { id: 'SP-MAI-SL1', name: 'SP MAI SL', group: 'SP_Y1', blocks: 5, desc: 'San Pedro · Año 1 Nivel Medio' },
+
+          // Año 1 Villa Cáritas
+          { id: 'VC-MAE-SL1', name: 'VC MAE SL', group: 'VC_Y1', blocks: 5, desc: 'Villa Cáritas · Año 1 Nivel Medio' },
+          { id: 'VC-MAE-HL1', name: 'VC MAE HL', group: 'VC_Y1', blocks: 7, desc: 'Villa Cáritas · Año 1 Nivel Superior (5b + 2b)' },
+          { id: 'VC-MAI-SL1-A', name: 'VC MAI SL (A)', group: 'VC_Y1', blocks: 5, desc: 'Villa Cáritas · Grupo A Nivel Medio' },
+          { id: 'VC-MAI-SL1-B', name: 'VC MAI SL (B)', group: 'VC_Y1', blocks: 5, desc: 'Villa Cáritas · Grupo B Nivel Medio' },
+
+          // Año 2 Diploma
+          { id: 'Y2-MAE-SL', name: 'Año 2 MAE SL', group: 'Y2', blocks: 7, desc: 'Nivel Medio · Año 2 (Sede Variable)' },
+          { id: 'Y2-MAE-HL', name: 'Año 2 MAE HL', group: 'Y2', blocks: 10, desc: 'Nivel Superior · Año 2 (7b + 3b extra)' },
+
+          // Grado 10
+          { id: 'G10-SP-1', name: 'Grado 10 SP-1', group: 'G10', blocks: 6, desc: 'San Pedro · Sección 1 Pre-IB' },
+          { id: 'G10-SP-2', name: 'Grado 10 SP-2', group: 'G10', blocks: 6, desc: 'San Pedro · Sección 2 Pre-IB' },
+          { id: 'G10-SP-3', name: 'Grado 10 SP-3', group: 'G10', blocks: 6, desc: 'San Pedro · Sección 3 Pre-IB' },
+          { id: 'G10-VC-1', name: 'Grado 10 VC-1', group: 'G10', blocks: 6, desc: 'Villa Cáritas · Sección 1 Pre-IB' },
+          { id: 'G10-VC-2', name: 'Grado 10 VC-2', group: 'G10', blocks: 6, desc: 'Villa Cáritas · Sección 2 Pre-IB' },
+          { id: 'G10-VC-3', name: 'Grado 10 VC-3', group: 'G10', blocks: 6, desc: 'Villa Cáritas · Sección 3 Pre-IB' },
+        ]);
+
+        // ASSIGNMENTS STATE { courseId: teacherId or null }
+        const assignments = ref({});
+
+        // PRESETS LOADERS
+        const presets = {
+          optionB: {
+            'VC-MAE-SL1': 'P1 SP',
+            'Y2-MAE-HL': 'P1 SP',
+            'SP-MAE-HL1': 'P2 SP',
+            'VC-MAE-HL1': 'P2 SP',
+            'G10-SP-2': 'P2 SP',
+            'SP-MAE-SL1': 'P1 VC',
+            'VC-MAI-SL1-B': 'P1 VC',
+            'Y2-MAE-SL': 'P1 VC',
+            'VC-MAI-SL1-A': 'P2 VC',
+            'SP-MAI-SL1': 'P2 VC',
+            'G10-VC-1': 'P2 VC',
+          },
+          optionA: {
+            'VC-MAE-SL1': 'P1 SP',
+            'Y2-MAE-HL': 'P1 SP',
+            'G10-VC-2': 'P1 SP',
+            'SP-MAE-HL1': 'P2 SP',
+            'VC-MAE-HL1': 'P2 SP',
+            'G10-SP-2': 'P2 SP',
+            'SP-MAE-SL1': 'P1 VC',
+            'VC-MAI-SL1-B': 'P1 VC',
+            'Y2-MAE-SL': 'P1 VC',
+            'VC-MAI-SL1-A': 'P2 VC',
+            'SP-MAI-SL1': 'P2 VC',
+            'G10-SP-1': 'P2 VC',
+            'G10-VC-1': 'P2 VC',
+          },
+          pureIb: {
+            'VC-MAE-SL1': 'P1 SP',
+            'Y2-MAE-HL': 'P1 SP',
+            'SP-MAE-HL1': 'P2 SP',
+            'VC-MAE-HL1': 'P2 SP',
+            'SP-MAE-SL1': 'P1 VC',
+            'VC-MAI-SL1-B': 'P1 VC',
+            'Y2-MAE-SL': 'P1 VC',
+            'VC-MAI-SL1-A': 'P2 VC',
+            'SP-MAI-SL1': 'P2 VC',
+          }
+        };
+
+        const loadPreset = (presetKey) => {
+          activePreset.value = presetKey;
+          clearAssignments();
+          const targetPreset = presets[presetKey];
+          if (targetPreset) {
+            Object.keys(targetPreset).forEach(cId => {
+              assignments.value[cId] = targetPreset[cId];
+            });
+          }
+          updateChart();
+        };
+
+        const clearAssignments = () => {
+          courses.value.forEach(c => {
+            assignments.value[c.id] = null;
+          });
+          updateChart();
+        };
+
+        const unassignCourse = (courseId) => {
+          assignments.value[courseId] = null;
+          updateChart();
+        };
+
+        const getCoursesByGroup = (group) => {
+          return courses.value.filter(c => c.group === group);
+        };
+
+        const getAssignedTeacher = (courseId) => {
+          return assignments.value[courseId] || 'Sin Asignar';
+        };
+
+        // COMPUTED METRICS
+        const getTeacherBlocks = (teacherId) => {
+          let sum = 0;
+          Object.keys(assignments.value).forEach(cId => {
+            if (assignments.value[cId] === teacherId) {
+              const c = courses.value.find(item => item.id === cId);
+              if (c) sum += c.blocks;
+            }
+          });
+          return sum;
+        };
+
+        const getTeacherFreeBlocks = (teacherId) => {
+          return Math.max(0, 22 - getTeacherBlocks(teacherId));
+        };
+
+        const getTeacherCourses = (teacherId) => {
+          const list = [];
+          Object.keys(assignments.value).forEach(cId => {
+            if (assignments.value[cId] === teacherId) {
+              const c = courses.value.find(item => item.id === cId);
+              if (c) list.push(c);
+            }
+          });
+          return list;
+        };
+
+        const getTeacherMobility = (teacherId) => {
+          const assigned = getTeacherCourses(teacherId);
+          const teacher = teachers.value.find(t => t.id === teacherId);
+          if (!teacher) return false;
+          
+          let teachesOtherSchool = false;
+          assigned.forEach(c => {
+            if (c.id.startsWith('SP-') && teacher.baseSchool === 'VC') teachesOtherSchool = true;
+            if (c.id.startsWith('VC-') && teacher.baseSchool === 'SP') teachesOtherSchool = true;
+          });
+          return teachesOtherSchool;
+        };
+
+        const totalAssignedBlocks = computed(() => {
+          let sum = 0;
+          Object.keys(assignments.value).forEach(cId => {
+            if (assignments.value[cId]) {
+              const c = courses.value.find(item => item.id === cId);
+              if (c) sum += c.blocks;
+            }
+          });
+          return sum;
+        });
+
+        const totalFreeBlocks = computed(() => {
+          return maxCapacity.value - totalAssignedBlocks.value;
+        });
+
+        const teachersOver20 = computed(() => {
+          return teachers.value.filter(t => getTeacherBlocks(t.id) > 20).length;
+        });
+
+        // STYLING HELPERS
+        const getTeacherBadgeClass = (teacher) => {
+          const b = getTeacherBlocks(teacher.id);
+          if (b > 22) return 'bg-red-100 text-red-800 border border-red-200';
+          if (b > 20) return 'bg-amber-100 text-amber-800 border border-amber-200';
+          if (b > 0) return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+          return 'bg-slate-100 text-slate-600 border border-slate-200';
+        };
+
+        const getTeacherBarClass = (teacher) => {
+          const b = getTeacherBlocks(teacher.id);
+          if (b > 22) return 'bg-red-500';
+          if (b > 20) return 'bg-amber-500';
+          return 'bg-emerald-500';
+        };
+
+        // RULE INSPECTIONS
+        const checkVcSimultaneity = computed(() => {
+          const vcCourses = ['VC-MAE-SL1', 'VC-MAE-HL1', 'VC-MAI-SL1-A', 'VC-MAI-SL1-B'];
+          const assignedTeachers = vcCourses.map(id => assignments.value[id]).filter(Boolean);
+          const uniqueTeachers = new Set(assignedTeachers);
+
+          if (assignedTeachers.length < 4) {
+            return {
+              valid: false,
+              message: `Faltan asignar salones de Villa Cáritas (${assignedTeachers.length}/4 asignados).`
+            };
+          }
+          if (uniqueTeachers.size < 4) {
+            return {
+              valid: false,
+              message: '¡Conflicto! Hay profesores repetidos en el bloque simultáneo de Villa Cáritas. Requiere 4 profesores distintos al mismo tiempo.'
+            };
+          }
+          return {
+            valid: true,
+            message: 'Cumplido: Los 4 salones de Villa Cáritas tienen 4 profesores distintos en simultáneo.'
+          };
+        });
+
+        const checkSpSimultaneity = computed(() => {
+          const spCourses = ['SP-MAE-SL1', 'SP-MAE-HL1', 'SP-MAI-SL1'];
+          const assignedTeachers = spCourses.map(id => assignments.value[id]).filter(Boolean);
+          const uniqueTeachers = new Set(assignedTeachers);
+
+          if (assignedTeachers.length < 3) {
+            return {
+              valid: false,
+              message: `Faltan asignar salones de San Pedro (${assignedTeachers.length}/3 asignados).`
+            };
+          }
+          if (uniqueTeachers.size < 3) {
+            return {
+              valid: false,
+              message: '¡Conflicto! Hay profesores repetidos en el bloque simultáneo de San Pedro.'
+            };
+          }
+          return {
+            valid: true,
+            message: 'Cumplido: Los 3 salones de San Pedro tienen 3 profesores distintos en simultáneo.'
+          };
+        });
+
+        const checkY2Simultaneity = computed(() => {
+          const tSl = assignments.value['Y2-MAE-SL'];
+          const tHl = assignments.value['Y2-MAE-HL'];
+          if (!tSl || !tHl) {
+            return { valid: true, message: 'Falta asignar uno o ambos grupos de Año 2.' };
+          }
+          if (tSl === tHl) {
+            return {
+              valid: false,
+              message: 'Atención: Si los grupos SL y HL de Año 2 corren a la misma hora, requieren profesores distintos.'
+            };
+          }
+          return {
+            valid: true,
+            message: 'Cumplido: Año 2 SL y HL tienen profesores distintos para dictado simultáneo.'
+          };
+        });
+
+        const checkMaxWorkload = computed(() => {
+          const overloaded = teachers.value.filter(t => getTeacherBlocks(t.id) > 22);
+          if (overloaded.length > 0) {
+            return {
+              valid: false,
+              message: `¡Exceso de carga! ${overloaded.map(t => t.id).join(', ')} supera los 22 bloques semanales.`
+            };
+          }
+          return {
+            valid: true,
+            message: 'Cumplido: Todos los profesores están dentro del límite máximo institucional de 22 bloques.'
+          };
+        });
+
+        const checkMaeHlExclusivity = computed(() => {
+          const violations = [];
+          teachers.value.forEach(t => {
+            const assigned = getTeacherCourses(t.id);
+            const hasHl = assigned.some(c => c.id.includes('MAE-HL'));
+            const hasMai = assigned.some(c => c.id.includes('MAI'));
+            if (hasHl && hasMai) {
+              violations.push(t.id);
+            }
+          });
+
+          if (violations.length > 0) {
+            return {
+              valid: false,
+              message: `Atención pedagógica: ${violations.join(', ')} dicta MAE HL y MAI al mismo tiempo (se recomienda especializar al docente de MAE HL).`
+            };
+          }
+          return {
+            valid: true,
+            message: 'Cumplido: Los docentes de MAE HL están dedicados y no dictan MAI.'
+          };
+        });
+
+        const validationErrors = computed(() => {
+          const errs = [];
+          if (!checkVcSimultaneity.value.valid) errs.push(checkVcSimultaneity.value.message);
+          if (!checkSpSimultaneity.value.valid) errs.push(checkSpSimultaneity.value.message);
+          if (!checkMaxWorkload.value.valid) errs.push(checkMaxWorkload.value.message);
+          return errs;
+        });
+
+        const statusTitle = computed(() => {
+          if (validationErrors.value.length > 0) return 'Conflicto de Reglas';
+          if (teachersOver20.value > 1) return 'Opción A (Alta Carga)';
+          return 'Opción B (Óptima)';
+        });
+
+        const statusBgClass = computed(() => {
+          if (validationErrors.value.length > 0) return 'bg-red-100 text-red-700';
+          if (teachersOver20.value > 1) return 'bg-amber-100 text-amber-700';
+          return 'bg-emerald-100 text-emerald-700';
+        });
+
+        const statusTextClass = computed(() => {
+          if (validationErrors.value.length > 0) return 'text-red-700';
+          if (teachersOver20.value > 1) return 'text-amber-700';
+          return 'text-emerald-700';
+        });
+
+        const statusIconClass = computed(() => {
+          if (validationErrors.value.length > 0) return 'fa-solid fa-triangle-exclamation';
+          if (teachersOver20.value > 1) return 'fa-solid fa-gauge-high';
+          return 'fa-solid fa-circle-check';
+        });
+
+        // CHART LOGIC
+        let chartInstance = null;
+        const chartColors = ['#2563eb', '#059669', '#8b5cf6', '#ea580c', '#d97706'];
+
+        const initChart = () => {
+          const ctx = document.getElementById('workloadChart');
+          if (!ctx) return;
+
+          chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: teachers.value.map(t => t.id),
+              datasets: [{
+                label: 'Bloques Asignados',
+                data: teachers.value.map(t => getTeacherBlocks(t.id)),
+                backgroundColor: chartColors.slice(0, teachers.value.length),
+                borderRadius: 6,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 24,
+                  grid: { color: '#f1f5f9' },
+                  ticks: { stepSize: 4 }
+                },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        };
+
+        const updateChart = () => {
+          if (chartInstance) {
+            chartInstance.data.labels = teachers.value.map(t => t.id);
+            chartInstance.data.datasets[0].data = teachers.value.map(t => getTeacherBlocks(t.id));
+            chartInstance.data.datasets[0].backgroundColor = chartColors.slice(0, teachers.value.length);
+            chartInstance.update();
+          }
+        };
+
+        watch(assignments, () => {
+          updateChart();
+        }, { deep: true });
+
+        onMounted(() => {
+          loadPreset('optionB');
+          setTimeout(initChart, 200);
+        });
+
+        return {
+          activeTab,
+          activePreset,
+          enable5thTeacher,
+          toggle5thTeacher,
+          maxCapacity,
+          teachers,
+          courses,
+          assignments,
+          loadPreset,
+          clearAssignments,
+          unassignCourse,
+          getCoursesByGroup,
+          getAssignedTeacher,
+          getTeacherBlocks,
+          getTeacherFreeBlocks,
+          getTeacherCourses,
+          getTeacherMobility,
+          totalAssignedBlocks,
+          totalFreeBlocks,
+          teachersOver20,
+          getTeacherBadgeClass,
+          getTeacherBarClass,
+          checkVcSimultaneity,
+          checkSpSimultaneity,
+          checkY2Simultaneity,
+          checkMaxWorkload,
+          checkMaeHlExclusivity,
+          validationErrors,
+          statusTitle,
+          statusBgClass,
+          statusTextClass,
+          statusIconClass,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
